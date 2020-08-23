@@ -25,12 +25,12 @@ export (float, 0.0, 1.0) var acceleration = 1.0
 export (float, 0.0, 0.0, 1.0) var deceleration = 0.1
 export var max_speed = Vector3(1.0, 1.0, 1.0)
 export var local = true
-export var forward_action = "ui_up"
-export var backward_action = "ui_down"
-export var left_action = "ui_left"
-export var right_action = "ui_right"
-export var up_action = "ui_page_up"
-export var down_action = "ui_page_down"
+export var forward_action = KEY_W
+export var backward_action = KEY_S
+export var left_action = KEY_A
+export var right_action = KEY_D
+export var up_action = KEY_Q
+export var down_action = KEY_E
 
 # Gui settings
 export var use_gui = true
@@ -48,7 +48,7 @@ var _speed = Vector3(0.0, 0.0, 0.0)
 var _gui
 
 func _ready():
-	_check_actions([forward_action, backward_action, left_action, right_action, gui_action, up_action, down_action])
+	##_check_actions([forward_action, backward_action, left_action, right_action, gui_action, up_action, down_action])
 
 	if privot:
 		privot = get_node(privot)
@@ -66,28 +66,39 @@ func _input(event):
 	if mouselook:
 		if event is InputEventMouseMotion:
 			_mouse_position = event.relative
-
-	if movement:
-		if event.is_action_pressed(forward_action):
-			_direction.z = -1
-		elif event.is_action_pressed(backward_action):
-			_direction.z = 1
-		elif not Input.is_action_pressed(forward_action) and not Input.is_action_pressed(backward_action):
-			_direction.z = 0
-
-		if event.is_action_pressed(left_action):
-			_direction.x = -1
-		elif event.is_action_pressed(right_action):
-			_direction.x = 1
-		elif not Input.is_action_pressed(left_action) and not Input.is_action_pressed(right_action):
-			_direction.x = 0
 			
-		if event.is_action_pressed(up_action):
-			_direction.y = 1
-		if event.is_action_pressed(down_action):
-			_direction.y = -1
-		elif not Input.is_action_pressed(up_action) and not Input.is_action_pressed(down_action):
-			_direction.y = 0
+		if event is InputEventMouseButton:
+			var zoom_pos
+		# zoom in
+			if event.button_index == BUTTON_WHEEL_UP:
+				distance +=1
+		# call the zoom function
+		# zoom out
+			if event.button_index == BUTTON_WHEEL_DOWN:
+				distance -=1
+	# call the zoom function
+	if movement:
+		if event is InputEventKey:
+			if event.scancode == forward_action:
+				_direction.z = -1
+			elif event.scancode == backward_action:
+				_direction.z = 1
+			elif (event.scancode != forward_action and event.scancode != backward_action):
+				_direction.z = 0
+
+			if event.scancode == left_action:
+				_direction.x = -1
+			elif event.scancode == right_action:
+				_direction.x = 1
+			elif (event.scancode != left_action and event.scancode != right_action):
+				_direction.x = 0
+
+			if event.scancode == up_action:
+				_direction.y = 1
+			if event.scancode == down_action:
+				_direction.y = -1
+			elif (event.scancode != up_action and event.scancode != down_action):
+				_direction.y = 0
 
 func _process(delta):
 	if privot:
