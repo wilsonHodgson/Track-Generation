@@ -19,24 +19,22 @@ _data = {
 [node name="Spatial" type="Spatial"]
 
 [node name="Camera" type="Camera" parent="."]
-transform = Transform( 1, 0, 0, 0, 0.951639, 0.307219, 0, -0.307219, 0.951639, -7.82375, 3.14802, 14.2058 )
+transform = Transform( 1, 0, 0, 0, 0.430075, 0.902793, 0, -0.902793, 0.430075, -7.82375, 82.5126, 10.7742 )
 far = 1600.1
 script = ExtResource( 1 )
-privot = NodePath("..")
 distance = 10.0
 rotate_privot = true
 max_speed = Vector3( 10, 10, 10 )
 
 [node name="Perfect_Track" type="Path" parent="."]
-transform = Transform( 4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0 )
-visible = false
+transform = Transform( 4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, -11.3882 )
 curve = SubResource( 1 )
 script = ExtResource( 2 )
 
 [node name="ImmediateGeometry" type="ImmediateGeometry" parent="Perfect_Track"]
 
 [node name="Poor_Track" type="Path" parent="."]
-visible = false
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8.82727 )
 curve = SubResource( 2 )
 script = ExtResource( 2 )
 
