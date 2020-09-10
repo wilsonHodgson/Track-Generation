@@ -11,14 +11,14 @@ albedo_color = Color( 0.61, 0.318115, 0.0793, 1 )
 
 [sub_resource type="BoxShape" id=3]
 
-[sub_resource type="CubeMesh" id=8]
+[sub_resource type="CubeMesh" id=4]
 
-[sub_resource type="ConvexPolygonShape" id=9]
+[sub_resource type="ConvexPolygonShape" id=5]
 points = PoolVector3Array( -1, 1, 1, 1, 1, -1, 1, 1, 1, -1, 1, -1, -1, -1, 1, 1, -1, -1, 1, -1, 1, -1, -1, -1, 1, 1, 1, -1, 1, -1, 1, 1, -1, -1, 1, 1, 1, -1, 1, -1, -1, -1, 1, -1, -1, -1, -1, 1, 1, 1, 1, -1, -1, 1, -1, 1, 1, 1, -1, 1, 1, 1, -1, -1, -1, -1, -1, 1, -1, 1, -1, -1 )
 
-[sub_resource type="PrismMesh" id=10]
+[sub_resource type="PrismMesh" id=6]
 
-[sub_resource type="ConvexPolygonShape" id=11]
+[sub_resource type="ConvexPolygonShape" id=7]
 points = PoolVector3Array( 0, 1, 1, 0, 1, -1, 0, 1, 1, 0, 1, -1, -1, -1, 1, 1, -1, -1, 1, -1, 1, -1, -1, -1, 0, 1, 1, 0, 1, -1, 0, 1, -1, 0, 1, 1, 1, -1, 1, -1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1, 1, 1, -1, 1, -1, -1, -1, 1, -1, -1 )
 
 [node name="Spatial" type="Spatial"]
@@ -36,6 +36,7 @@ transform = Transform( 1, 0, 0, 0, 0.0115266, 0, 0, 0, 1, 0, -0.0119365, 0 )
 shape = SubResource( 3 )
 
 [node name="Bike" parent="." instance=ExtResource( 1 )]
+transform = Transform( 0.999484, 0, -0.0321084, 0, 1, 0, 0.0321084, 0, 0.999484, 0, 0.512639, -2.33557 )
 
 [node name="Camera" type="Camera" parent="."]
 transform = Transform( -0.0154293, -0.380506, 0.92465, -0.00634848, 0.924779, 0.380453, -0.999861, 4.65726e-10, -0.0166843, 2.50293, 1.46588, 0.7591 )
@@ -48,29 +49,29 @@ can_sleep = false
 
 [node name="MeshInstance" type="MeshInstance" parent="Box"]
 transform = Transform( 0.168138, 0, 0, 0, 0.136212, 0, 0, 0, 0.142497, 0, 0, 0 )
-mesh = SubResource( 8 )
+mesh = SubResource( 4 )
 material/0 = null
 
 [node name="CollisionShape" type="CollisionShape" parent="Box"]
 transform = Transform( 0.168138, 0, 0, 0, 0.136212, 0, 0, 0, 0.142497, 0, 0, 0 )
-shape = SubResource( 9 )
+shape = SubResource( 5 )
 
 [node name="Ramp" type="StaticBody" parent="."]
 transform = Transform( 0.0203665, 0, -0.999793, 0, 0.255446, 0, 0.999793, 0, 0.0203665, 0, 0.238976, 0.770974 )
 
 [node name="MeshInstance" type="MeshInstance" parent="Ramp"]
-mesh = SubResource( 10 )
+mesh = SubResource( 6 )
 material/0 = null
 
 [node name="CollisionShape" type="CollisionShape" parent="Ramp"]
-shape = SubResource( 11 )
+shape = SubResource( 7 )
 
 [node name="Ramp2" type="StaticBody" parent="."]
 transform = Transform( -0.9995, 0, -0.03162, 0, 0.255446, 0, 0.03162, 0, -0.9995, -3.27401, 0.238976, -2.1091 )
 
 [node name="MeshInstance" type="MeshInstance" parent="Ramp2"]
-mesh = SubResource( 10 )
+mesh = SubResource( 6 )
 material/0 = null
 
 [node name="CollisionShape" type="CollisionShape" parent="Ramp2"]
-shape = SubResource( 11 )
+shape = SubResource( 7 )
