@@ -15,35 +15,42 @@ func _process(delta):
 func _physics_process(delta):
 	if Input.is_action_just_pressed("bike_move_forward"):
 		front_wheel.add_force(front_wheel.transform.basis.z * 1000 * delta, Vector3(0,0,0))
-		add_torque(Vector3(0, relative_front_wheel_yaw() * 10 * delta, 0))
+		#add_torque(Vector3(0, relative_front_wheel_yaw() * 10 * delta, 0))
 			
 	if Input.is_action_just_pressed("bike_hop"):
-		add_force(transform.basis.y * 1000 * delta, Vector3(0,0,0))
-		front_wheel.add_force(transform.basis.y * 2000 * delta, Vector3(0,0,0))
+		add_force(transform.basis.y * 1000 * delta, Vector3())
+		front_wheel.add_force(transform.basis.y * 2000 * delta, Vector3())
+		
 	if Input.is_action_pressed("bike_rotate_left"):
 		front_wheel.add_torque(Vector3(0, 4 * delta, 0))
 	elif Input.is_action_pressed("bike_rotate_right"):
 		front_wheel.add_torque(Vector3(0, -4 * delta, 0))
 		
-	var wheel_friction = friction_low + (percent_vel_against_dir(front_wheel) * friction_high)
+	if Input.is_key_pressed(KEY_LEFT):
+		add_force(transform.basis.x * 100 * delta, Vector3())
+		front_wheel.add_force(front_wheel.transform.basis.x * 100 * delta, Vector3())
+	if Input.is_key_pressed(KEY_RIGHT):
+		add_force(transform.basis.x * -100 * delta, Vector3())
+		front_wheel.add_force(front_wheel.transform.basis.x * 100 * delta, Vector3())
+	if Input.is_key_pressed(KEY_DOWN):
+		add_force(transform.basis.z * -100 * delta, Vector3())
+		front_wheel.add_force(front_wheel.transform.basis.z * -100 * delta, Vector3())
+		
+	var wheel_friction = friction_low + (percent_velocity_sideways(front_wheel) * friction_high)
 	front_wheel.physics_material_override.friction = wheel_friction
 	
-	var body_friction = friction_low + (percent_vel_against_dir(self) * friction_high)
+	var body_friction = friction_low + (percent_velocity_sideways(self) * friction_high)
 	physics_material_override.friction = body_friction
 	
-	print("wheel: %s\tbody: %s" % [wheel_friction, body_friction])
+	#print("wheel: %s\tbody: %s" % [wheel_friction, body_friction])
 
-func percent_vel_against_dir(body):
-	var velocity_dir = Vector3(body.linear_velocity.x, 0, body.linear_velocity.z)
-	if velocity_dir.length() < 0.01:
+func percent_velocity_sideways(body):
+	if body.linear_velocity.length() < 0.01:
 		return 0
 	else:
-		return (body.transform.basis.z.normalized() - velocity_dir.normalized()).length() / 2
-	
-
-func relative_front_wheel_yaw():
-	var result = degree_diff(rotation.y, front_wheel.rotation.y)
-	return result
+		# Calculate the dot product of the forward vector and the velocity vector
+		var dot_prod = body.transform.basis.z.normalized().dot(body.linear_velocity.normalized()) 
+		return sin((dot_prod - 1) * -0.5 * PI)
 	
 func degree_diff(deg_a, deg_b):
 	deg_a = to_bound_degrees(deg_a)
