@@ -36,7 +36,6 @@ transform = Transform( 1, 0, 0, 0, 0.0115266, 0, 0, 0, 1, 0, -0.0119365, 0 )
 shape = SubResource( 3 )
 
 [node name="Bike" parent="." instance=ExtResource( 1 )]
-transform = Transform( 0.999484, 0, -0.0321084, 0, 1, 0, 0.0321084, 0, 0.999484, 0, 0.512639, -2.33557 )
 
 [node name="Camera" type="Camera" parent="."]
 transform = Transform( -0.0154293, -0.380506, 0.92465, -0.00634848, 0.924779, 0.380453, -0.999861, 4.65726e-10, -0.0166843, 2.50293, 1.46588, 0.7591 )
