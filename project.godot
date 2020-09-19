@@ -18,6 +18,7 @@ _global_script_class_icons={
 config/name="Racing_Prototype"
 run/main_scene="res://Track_Demo.tscn"
 config/icon="res://icon.png"
+config/main_scene="res://Track_Demo.tscn"
 
 [rendering]
 

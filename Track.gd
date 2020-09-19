@@ -6,18 +6,12 @@ extends Path
 
 ##DRAWS A TRACK FROM A WELL DEFINED CURVE
 func drawRoad():
-	print(self.curve.get_baked_length())
-		# avoid using interpolate_baked, see results
 	var num_samples = 120
 	var num_points = self.curve.get_point_count()
 	var num_subsamples = float(num_samples)/num_points
 	var starting_line = {}
 	for i in num_points+1:
 		for j in num_subsamples+1:
-			if j != 0:
-				print(i+(1/num_subsamples*j))
-			else:
-				print(i)
 			var point_on_curve = self.curve.interpolate(i, 0)*scale.x
 			var next_point_on_curve = self.curve.interpolate(i, 0.00001)*scale.y
 			
