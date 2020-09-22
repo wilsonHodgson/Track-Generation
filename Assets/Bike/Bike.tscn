@@ -1,7 +1,8 @@
-[gd_scene load_steps=6 format=2]
+[gd_scene load_steps=7 format=2]
 
 [ext_resource path="res://Assets/Bike/BikePhysics.tres" type="PhysicsMaterial" id=1]
 [ext_resource path="res://Assets/Bike/BikeController.gd" type="Script" id=2]
+[ext_resource path="res://Assets/Bike/BikeCamera.gd" type="Script" id=3]
 
 [sub_resource type="CylinderMesh" id=1]
 
@@ -12,14 +13,14 @@ points = PoolVector3Array( 0, 1, 1, 0.0980171, 1, 0.995185, 0.19509, 1, 0.980785
 
 [node name="Bike" type="Spatial"]
 transform = Transform( 0.999484, 0, -0.0321084, 0, 1, 0, 0.0321084, 0, 0.999484, 0, 0.512639, -2.33557 )
+script = ExtResource( 2 )
 
 [node name="FrontWheelJoint" type="Generic6DOFJoint" parent="."]
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0.2 )
 nodes/node_a = NodePath("../BikeFrontWheel")
 nodes/node_b = NodePath("../BikeBody")
-angular_limit_x/enabled = false
-angular_limit_x/upper_angle = 20.0
-angular_limit_x/lower_angle = -20.0
+angular_limit_x/upper_angle = 60.0
+angular_limit_x/lower_angle = -60.0
 angular_limit_x/restitution = 2.0
 angular_limit_x/damping = 0.5
 angular_spring_x/stiffness = 5.0
@@ -30,16 +31,15 @@ linear_spring_y/enabled = true
 linear_spring_y/stiffness = 20.0
 linear_spring_y/damping = 1.0
 linear_spring_y/equilibrium_point = 0.09
-angular_limit_y/upper_angle = 20.0
-angular_limit_y/lower_angle = -20.0
-angular_spring_y/stiffness = 5.0
-angular_spring_y/damping = 1.0
+angular_limit_y/upper_angle = 30.0
+angular_limit_y/lower_angle = -30.0
+angular_spring_y/enabled = true
+angular_spring_y/stiffness = 0.005
 angular_spring_z/stiffness = 5.0
 
 [node name="BikeBody" type="RigidBody" parent="."]
 mass = 0.4
 physics_material_override = ExtResource( 1 )
-script = ExtResource( 2 )
 
 [node name="RearWheelMesh" type="MeshInstance" parent="BikeBody"]
 transform = Transform( -1.62921e-08, 0.02, 0, -0.1, -3.25841e-09, 0, 0, 0, 0.1, 0, 0, -0.2 )
@@ -51,7 +51,7 @@ transform = Transform( -1.62921e-08, 0.02, 0, -0.1, -3.25841e-09, 0, 0, 0, 0.1, 
 shape = SubResource( 2 )
 
 [node name="FrameTube" type="MeshInstance" parent="BikeBody"]
-transform = Transform( 0.01, 0, 0, 0, -1.62921e-08, 0.01, 0, -0.1, -1.62921e-09, 0, 0.04, 0 )
+transform = Transform( 0.01, 2.32831e-10, 3.46945e-18, 0, -1.62921e-08, 0.01, 0, -0.1, -1.62921e-09, 0, 0.04, 0 )
 mesh = SubResource( 3 )
 material/0 = null
 
@@ -61,6 +61,7 @@ mass = 0.3
 physics_material_override = ExtResource( 1 )
 axis_lock_angular_x = true
 axis_lock_angular_z = true
+angular_damp = 1.0
 
 [node name="FrontWheelMesh" type="MeshInstance" parent="BikeFrontWheel"]
 transform = Transform( -1.62921e-08, 0.02, 0, -0.1, -3.25841e-09, 0, 0, 0, 0.1, 0, 0, 0 )
@@ -70,3 +71,8 @@ material/0 = null
 [node name="FrontWheelShape" type="CollisionShape" parent="BikeFrontWheel"]
 transform = Transform( -1.62921e-08, 0.02, 0, -0.1, -3.25841e-09, 0, 0, 0, 0.1, 0, 0, 0 )
 shape = SubResource( 2 )
+
+[node name="Camera" type="Camera" parent="."]
+transform = Transform( -0.99992, 0.0124611, 0.0025157, 0.0124612, 0.921619, 0.387895, 0.00251508, 0.387895, -0.921701, 0, 1, -1.2 )
+current = true
+script = ExtResource( 3 )
