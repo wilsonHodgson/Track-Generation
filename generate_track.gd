@@ -144,5 +144,7 @@ func _ready():
 
 	$ImmediateGeometry.end()
 	
-	_spawnCar()
+	#_spawnCar()
+	var startingPoint = self.curve.interpolate(0, 0.5)*scale+position
+	find_parent("Spatial").find_node("Bike").transform.origin = Vector3(startingPoint.x, 1, startingPoint.y)
 

@@ -1,0 +1,30 @@
+[gd_scene load_steps=4 format=2]
+
+[ext_resource path="res://Assets/Bike/Bike.tscn" type="PackedScene" id=1]
+[ext_resource path="res://generate_track.gd" type="Script" id=2]
+
+[sub_resource type="Curve2D" id=1]
+_data = {
+"points": PoolVector2Array( 0.0469098, -30.6058, -0.0469098, 30.6058, -206.172, -249.249, 0.0360795, -22.4729, -0.0360795, 22.4729, -186.422, -222.749, 0.01856, -48.5572, -0.01856, 48.5572, -160.922, -207.249, -39.3778, -11.6235, 39.3778, 11.6235, -176.736, -122.938, -6.74638, 23.0174, 6.74638, -23.0174, -106.026, -110.387 )
+}
+
+[node name="Spatial" type="Spatial"]
+
+[node name="Bike" parent="." instance=ExtResource( 1 )]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.79577, -8.67399 )
+
+[node name="Track" type="Spatial" parent="."]
+
+[node name="Path2D" type="Path2D" parent="Track"]
+position = Vector2( 50, -0.0787506 )
+rotation = 1.5708
+curve = SubResource( 1 )
+script = ExtResource( 2 )
+
+[node name="ImmediateGeometry" type="ImmediateGeometry" parent="Track/Path2D"]
+
+[node name="StaticBody" type="StaticBody" parent="Track/Path2D"]
+
+[node name="Finish" type="Node2D" parent="Track/Path2D"]
+position = Vector2( -3203.6, -3603.67 )
+rotation = -1.5708

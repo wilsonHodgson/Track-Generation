@@ -63,6 +63,7 @@ func _update_bike_friction():
 	
 	var body_friction = friction_low + (_percent_velocity_sideways(bike_body) * friction_high)
 	bike_body.physics_material_override.friction = body_friction
+	print(body_friction)
 	
 func _update_bike_body_centering():
 	if current_speed > 0 and in_contact:
@@ -77,7 +78,6 @@ func _update_bike_body_centering():
 		# Dampen excess body movement on the angular y axis
 		var dampen_power = min(current_speed * speed_body_dampen_ratio, body_dampen_max)
 		wheel_joint.set_param_y(Generic6DOFJoint.PARAM_ANGULAR_SPRING_DAMPING, dampen_power)
-		print("Spring: %s\tDampen: %s" % [spring_power, dampen_power])
 	elif wheel_joint.get_flag_y(Generic6DOFJoint.FLAG_ENABLE_ANGULAR_SPRING):
 		# Disable the spring if there's no forward speed or contact with other bodies
 		wheel_joint.set_flag_y(Generic6DOFJoint.FLAG_ENABLE_ANGULAR_SPRING, false)
