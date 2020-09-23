@@ -1,18 +1,27 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=4 format=2]
 
 [ext_resource path="res://generate_track.gd" type="Script" id=1]
+[ext_resource path="res://assets/3d_car_customizable/car.tscn" type="PackedScene" id=2]
 
 [sub_resource type="Curve2D" id=1]
 _data = {
-"points": PoolVector2Array( 50.4538, 100.908, -50.4538, -100.908, -12.4968, -122.752, -3.1624, -0.434055, 3.1624, 0.434055, 116.034, -217.362, 0.86811, 1.73622, -0.86811, -1.73622, 119.665, -221.191, -46.346, -17.0642, 46.346, 17.0642, 127.769, -239.76, -51.6595, 231.881, 51.6595, -231.881, 336.952, -113.208, -70.6353, -72.3171, 70.6353, 72.3171, 154.338, 16.9207, 65.5899, -16.8179, -65.5899, 16.8179, 105.229, 102.608, 77.3625, 158.089, -77.3625, -158.089, -12.4968, -122.752 )
+"points": PoolVector2Array( 0.0469098, -30.6058, -0.0469098, 30.6058, -206.172, -249.249, 0.0360795, -22.4729, -0.0360795, 22.4729, -186.422, -222.749, 0.01856, -48.5572, -0.01856, 48.5572, -160.922, -207.249, -39.3778, -11.6235, 39.3778, 11.6235, -176.736, -122.938, -6.74638, 23.0174, 6.74638, -23.0174, -106.026, -110.387 )
 }
 
-[node name="Track3" type="Spatial"]
+[node name="Track" type="Spatial"]
 
 [node name="Path2D" type="Path2D" parent="."]
-position = Vector2( 19.2418, 18.8297 )
-scale = Vector2( 0.2, 0.2 )
+position = Vector2( 50, -0.0787506 )
+rotation = 1.5708
 curve = SubResource( 1 )
 script = ExtResource( 1 )
 
 [node name="ImmediateGeometry" type="ImmediateGeometry" parent="Path2D"]
+
+[node name="StaticBody" type="StaticBody" parent="Path2D"]
+
+[node name="Car" parent="Path2D" instance=ExtResource( 2 )]
+
+[node name="Finish" type="Node2D" parent="Path2D"]
+position = Vector2( -3203.6, -3603.67 )
+rotation = -1.5708
