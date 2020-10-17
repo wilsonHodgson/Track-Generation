@@ -6,8 +6,9 @@ onready var wheel_joint = get_parent().find_node("FrontWheelJoint")
 
 var current_speed = 0
 var max_speed = 5
+var _wheel_velocity_norm = Vector3()
 
-var friction_high = 1.5
+var friction_high = 2.0
 var friction_low = 0
 
 # Time to fully dampen turning after releasing the turn key in msec
@@ -26,8 +27,12 @@ func _ready():
 	find_node("Camera").activate_camera()
 
 func _physics_process(delta):
-	var direction = sign(front_wheel.transform.basis.z.dot(front_wheel.linear_velocity.normalized()))
-	current_speed = (front_wheel.linear_velocity.length() * direction)
+	_wheel_velocity_norm = front_wheel.linear_velocity.normalized()
+	# Find the dot between the forward vector and the velocity vector to determine direction
+	var direction = sign(front_wheel.global_transform.basis.z.dot(_wheel_velocity_norm))
+	# Project the velocity vector onto the forward vector at the same magnitude to determine the forward velocity
+	var forward_velocity = front_wheel.linear_velocity.project(front_wheel.global_transform.basis.z)
+	current_speed = forward_velocity.length() * direction
 	
 	_process_movement_input(delta)	
 	_update_bike_friction()
@@ -37,7 +42,10 @@ func _process_movement_input(delta):
 	accelerating = false
 	if Input.is_action_pressed("bike_move_forward"):
 		if current_speed < max_speed:
-			bike_body.add_force(bike_body.transform.basis.z * 150 * delta, Vector3(0,0,0))
+			# Apply force towards the forward vector at max speed
+			var force_direction = (bike_body.global_transform.basis.z * max_speed) - bike_body.linear_velocity
+			print(current_speed)
+			bike_body.add_force(force_direction.normalized() * 150 * delta, Vector3())
 		if current_speed > 0:
 			accelerating = true
 			
@@ -72,7 +80,6 @@ func _update_bike_friction():
 	
 	var body_friction = friction_low + (_percent_velocity_sideways(bike_body) * friction_high)
 	bike_body.physics_material_override.friction = body_friction
-	print(body_friction)
 		
 func _update_bike_body_centering(delta):
 	if accelerating and not turning:
@@ -90,7 +97,7 @@ func _update_bike_body_centering(delta):
 	elif cur_joint_angle < _target_joint_angle:
 		wheel_joint.set_param_y(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT, _target_joint_angle)
 		wheel_joint.set_param_y(Generic6DOFJoint.PARAM_ANGULAR_LOWER_LIMIT, _target_joint_angle * -1)
-
+	
 func _percent_velocity_sideways(body):
 	# Calculate the dot product of the forward vector and the velocity vector
 	var dot_prod = body.transform.basis.z.normalized().dot(body.linear_velocity.normalized()) 

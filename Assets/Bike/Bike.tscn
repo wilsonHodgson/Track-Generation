@@ -33,8 +33,10 @@ linear_spring_y/damping = 1.0
 linear_spring_y/equilibrium_point = 0.09
 angular_limit_y/upper_angle = 30.0
 angular_limit_y/lower_angle = -30.0
+angular_limit_y/restitution = 5.0
 angular_spring_y/enabled = true
 angular_spring_y/stiffness = 0.005
+linear_limit_z/restitution = 5.0
 angular_spring_z/stiffness = 5.0
 
 [node name="BikeBody" type="RigidBody" parent="."]
