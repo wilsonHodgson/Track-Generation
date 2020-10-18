@@ -12,7 +12,7 @@ points = PoolVector3Array( 0, 1, 1, 0.0980171, 1, 0.995185, 0.19509, 1, 0.980785
 [sub_resource type="CylinderMesh" id=3]
 
 [node name="Bike" type="Spatial"]
-transform = Transform( 0.999484, 0, -0.0321084, 0, 1, 0, 0.0321084, 0, 0.999484, 0, 0.512639, -2.33557 )
+transform = Transform( 0.999484, 0, -0.0321084, 0, 1, 0, 0.0321084, 0, 0.999484, 0, 0, 0 )
 script = ExtResource( 2 )
 
 [node name="FrontWheelJoint" type="Generic6DOFJoint" parent="."]
@@ -33,10 +33,7 @@ linear_spring_y/damping = 1.0
 linear_spring_y/equilibrium_point = 0.09
 angular_limit_y/upper_angle = 30.0
 angular_limit_y/lower_angle = -30.0
-angular_limit_y/restitution = 5.0
-angular_spring_y/enabled = true
 angular_spring_y/stiffness = 0.005
-linear_limit_z/restitution = 5.0
 angular_spring_z/stiffness = 5.0
 
 [node name="BikeBody" type="RigidBody" parent="."]
@@ -80,5 +77,6 @@ shape = SubResource( 2 )
 transform = Transform( -0.99992, 0.0124611, 0.0025157, 0.0124612, 0.921619, 0.387895, 0.00251508, 0.387895, -0.921701, 0, 1, -1.2 )
 current = true
 script = ExtResource( 3 )
+[connection signal="started_accelerating" from="." to="Camera" method="_on_Bike_started_accelerating"]
 [connection signal="body_entered" from="BikeFrontWheel" to="." method="_on_BikeFrontWheel_body_entered"]
 [connection signal="body_exited" from="BikeFrontWheel" to="." method="_on_BikeFrontWheel_body_exited"]
