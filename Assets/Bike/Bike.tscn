@@ -77,6 +77,5 @@ shape = SubResource( 2 )
 transform = Transform( -0.99992, 0.0124611, 0.0025157, 0.0124612, 0.921619, 0.387895, 0.00251508, 0.387895, -0.921701, 0, 1, -1.2 )
 current = true
 script = ExtResource( 3 )
-[connection signal="started_accelerating" from="." to="Camera" method="_on_Bike_started_accelerating"]
 [connection signal="body_entered" from="BikeFrontWheel" to="." method="_on_BikeFrontWheel_body_entered"]
 [connection signal="body_exited" from="BikeFrontWheel" to="." method="_on_BikeFrontWheel_body_exited"]
