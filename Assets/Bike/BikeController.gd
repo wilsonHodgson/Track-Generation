@@ -3,6 +3,7 @@ extends Spatial
 signal started_accelerating
 
 onready var front_wheel = get_parent().find_node("BikeFrontWheel")
+onready var front_fork = find_node("FrontFork")
 onready var bike_body = get_parent().find_node("BikeBody")
 onready var wheel_joint = get_parent().find_node("FrontWheelJoint")
 
@@ -38,7 +39,8 @@ func _physics_process(delta):
 	var forward_velocity = front_wheel.linear_velocity.project(front_wheel.global_transform.basis.z)
 	current_speed = forward_velocity.length() * direction
 	
-	_process_movement_input(delta)	
+	_process_movement_input(delta)
+	_update_fork_rotation()
 	_update_bike_friction()
 	_update_bike_body_centering(delta)
 	_update_bike_roll(delta)
@@ -85,6 +87,12 @@ func _process_movement_input(delta):
 			var percent_damped = min(float(OS.get_ticks_msec() - _turning_damp_start) / turning_damp_time, 1)
 			front_wheel.angular_damp = -1.0 + sin(percent_damped * PI * 0.5) * 2.0
 
+func _update_fork_rotation():
+	front_fork.global_transform.basis = Basis(
+		front_wheel.global_transform.basis.x,
+		bike_body.global_transform.basis.y,
+		front_wheel.global_transform.basis.z)
+
 func _update_bike_friction():
 	var wheel_friction = friction_low + (_percent_velocity_sideways(front_wheel) * friction_high)
 	front_wheel.physics_material_override.friction = wheel_friction
@@ -118,7 +126,6 @@ func _update_bike_roll(delta):
 	var roll = min(abs(forward_velocity_normal), 2) * sign(forward_velocity_normal) * (current_speed / max_speed) * -1
 	wheel_joint.set_param_z(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT, roll)
 	wheel_joint.set_param_z(Generic6DOFJoint.PARAM_ANGULAR_LOWER_LIMIT, roll)
-	
 	
 func _percent_velocity_sideways(body):
 	# Calculate the dot product of the forward vector and the velocity vector
