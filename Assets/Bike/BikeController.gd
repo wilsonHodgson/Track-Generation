@@ -3,17 +3,19 @@ extends Spatial
 signal started_accelerating
 
 onready var front_wheel = get_parent().find_node("BikeFrontWheel")
+onready var front_wheel_mesh = front_wheel.get_node("Mesh")
+onready var front_wheel_shape = front_wheel.get_node("CollisionShape")
 onready var front_fork = find_node("FrontFork")
 onready var bike_body = get_parent().find_node("BikeBody")
 onready var wheel_joint = get_parent().find_node("FrontWheelJoint")
 
 var current_speed = 0
 # Speed in units forward per second
-var max_speed = 5
-var max_turn_force = 20
+var max_speed = 6
+var max_turn_force = 15
 
 var friction_high = 3.0
-var friction_low = 0
+var friction_low = 0.01
 
 # Time to fully dampen turning after releasing the turn key in msec
 var turning_damp_time = 150 
@@ -40,10 +42,13 @@ func _physics_process(delta):
 	current_speed = forward_velocity.length() * direction
 	
 	_process_movement_input(delta)
-	_update_fork_rotation()
+	_update_fork_basis()
+	_update_front_wheel_basis()
 	_update_bike_friction()
 	_update_bike_body_centering(delta)
 	_update_bike_roll(delta)
+	
+	
 
 func _process_movement_input(delta):
 	if Input.is_action_pressed("bike_move_forward"):
@@ -87,11 +92,30 @@ func _process_movement_input(delta):
 			var percent_damped = min(float(OS.get_ticks_msec() - _turning_damp_start) / turning_damp_time, 1)
 			front_wheel.angular_damp = -1.0 + sin(percent_damped * PI * 0.5) * 2.0
 
-func _update_fork_rotation():
+func _update_fork_basis():
 	front_fork.global_transform.basis = Basis(
 		front_wheel.global_transform.basis.x,
 		bike_body.global_transform.basis.y,
 		front_wheel.global_transform.basis.z)
+		
+func _update_front_wheel_basis():
+	var mesh_scale = front_wheel_mesh.global_transform.basis.get_scale()
+	var new_basis = Basis(
+		bike_body.global_transform.basis.y.normalized() * -0.1,
+		#front_wheel_mesh.global_transform.basis.y,
+		front_wheel_mesh.global_transform.basis.y,
+		front_wheel_mesh.global_transform.basis.z)
+	#front_wheel_mesh.global_transform.basis = new_basis
+	print("\nScale -- Old -- New\n%s" % [mesh_scale])
+	_print_basis_xyz(front_wheel_mesh.global_transform.basis)
+	_print_basis_xyz(new_basis)
+		
+#	var shape_scale = front_wheel_shape.global_transform.basis.get_scale()
+	front_wheel_mesh.global_transform.basis = new_basis
+#	front_wheel_shape.global_transform.basis.scaled(shape_scale)
+
+func _print_basis_xyz(basis):
+	print("(%s, %s, %s)" % [basis.x, basis.y, basis.z])
 
 func _update_bike_friction():
 	var wheel_friction = friction_low + (_percent_velocity_sideways(front_wheel) * friction_high)
@@ -102,7 +126,7 @@ func _update_bike_friction():
 		
 func _update_bike_body_centering(delta):
 	if accelerating:
-		_target_joint_angle = 0.0
+		_target_joint_angle = (0.0 / 180.0) * PI
 	elif turning:
 		_target_joint_angle = base_joint_angle
 	
