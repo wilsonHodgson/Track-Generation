@@ -9,13 +9,17 @@ onready var front_fork = find_node("FrontFork")
 onready var bike_body = get_parent().find_node("BikeBody")
 onready var wheel_joint = get_parent().find_node("FrontWheelJoint")
 
+var using_joypad = false
+var joypad_device = 0
+var turning_deadzone = 0.05
+
 var current_speed = 0
 # Speed in units forward per second
 var max_speed = 6
-var max_turn_force = 15
+var max_turn_force = 20
 
 var friction_high = 3.0
-var friction_low = 0.01
+var friction_low = 0.001
 
 # Time to fully dampen turning after releasing the turn key in msec
 var turning_damp_time = 150 
@@ -30,9 +34,17 @@ var _target_joint_angle = base_joint_angle
 var in_contact = false
 var accelerating = false
 var turning = false
+var drifting = false
 
 func _ready():
 	find_node("Camera").activate_camera()
+	_get_joypad()
+	
+func _get_joypad():
+	var joypads = Input.get_connected_joypads()
+	if joypads.size() > 0:
+		using_joypad = true
+		joypad_device = joypads[0]
 
 func _physics_process(delta):
 	# Find the dot between the forward vector and the velocity vector to determine direction
@@ -41,17 +53,20 @@ func _physics_process(delta):
 	var forward_velocity = front_wheel.linear_velocity.project(front_wheel.global_transform.basis.z)
 	current_speed = forward_velocity.length() * direction
 	
+	# Movement updates
 	_process_movement_input(delta)
-	_update_fork_basis()
-	_update_front_wheel_basis()
 	_update_bike_friction()
 	_update_bike_body_centering(delta)
+	
+	# Visual updates
 	_update_bike_roll(delta)
-	
-	
+	_update_fork_basis()
+	_update_front_wheel_basis()
 
 func _process_movement_input(delta):
-	if Input.is_action_pressed("bike_move_forward"):
+	drifting = Input.is_action_pressed("bike_drift")
+		
+	if Input.is_action_pressed("bike_move_forward") and not drifting:
 		if Input.is_action_just_pressed("bike_move_forward"):
 			accelerating = true
 			emit_signal("started_accelerating")
@@ -71,26 +86,36 @@ func _process_movement_input(delta):
 		bike_body.add_force(bike_body.transform.basis.y * 1000 * delta, Vector3())
 		front_wheel.add_force(bike_body.transform.basis.y * 2000 * delta, Vector3())
 		
-	if Input.is_action_just_pressed("bike_rotate_left") or Input.is_action_just_pressed("bike_rotate_right"):
-		turning = true
-		front_wheel.angular_damp = -1
+	var turn_input = _get_turn_input()
 		
-	if Input.is_action_pressed("bike_rotate_left"):
-		front_wheel.add_torque(Vector3(0, 2 * delta, 0))
-		bike_body.add_force(bike_body.transform.basis.x * (current_speed * max_turn_force) * delta, Vector3())
-		front_wheel.add_force(front_wheel.transform.basis.x * (current_speed * max_turn_force) * delta, Vector3())
-	elif Input.is_action_pressed("bike_rotate_right"):
-		front_wheel.add_torque(Vector3(0, -2 * delta, 0))
-		bike_body.add_force(bike_body.transform.basis.x * (current_speed * -max_turn_force) * delta, Vector3())
-		front_wheel.add_force(front_wheel.transform.basis.x * (current_speed * -max_turn_force) * delta, Vector3())
+	if turn_input != 0:
+		if !turning:
+			turning = true
+			front_wheel.angular_damp = -1
+		front_wheel.add_torque(Vector3(0, 2 * turn_input * delta, 0))
+		bike_body.add_force(bike_body.transform.basis.x * (current_speed * max_turn_force * turn_input) * delta, Vector3())
+		front_wheel.add_force(front_wheel.transform.basis.x * (current_speed * max_turn_force * turn_input) * delta, Vector3())
 	else:
-		if Input.is_action_just_released("bike_rotate_left") or Input.is_action_just_released("bike_rotate_right"):
+		if turning:
 			turning = false
 			_turning_damp_start = OS.get_ticks_msec()
 		# Climb to fully dampened turning on a sine wave when no turning is pressed
 		if front_wheel.angular_damp < 1:
 			var percent_damped = min(float(OS.get_ticks_msec() - _turning_damp_start) / turning_damp_time, 1)
 			front_wheel.angular_damp = -1.0 + sin(percent_damped * PI * 0.5) * 2.0
+			
+func _get_turn_input():
+	if Input.is_action_pressed("bike_rotate_left"):
+		return 1
+	elif Input.is_action_pressed("bike_rotate_right"):
+		return -1
+	elif using_joypad:
+		var axis_input = Input.get_joy_axis(joypad_device, JOY_ANALOG_LX) * -1
+		if axis_input > -turning_deadzone and axis_input < turning_deadzone:
+			axis_input = 0
+		return axis_input
+	else:
+		return 0 
 
 func _update_fork_basis():
 	front_fork.global_transform.basis = Basis(
@@ -101,18 +126,10 @@ func _update_fork_basis():
 func _update_front_wheel_basis():
 	var mesh_scale = front_wheel_mesh.global_transform.basis.get_scale()
 	var new_basis = Basis(
-		bike_body.global_transform.basis.y.normalized() * -0.1,
-		#front_wheel_mesh.global_transform.basis.y,
+		bike_body.global_transform.basis.y * -0.1,
 		front_wheel_mesh.global_transform.basis.y,
-		front_wheel_mesh.global_transform.basis.z)
-	#front_wheel_mesh.global_transform.basis = new_basis
-	print("\nScale -- Old -- New\n%s" % [mesh_scale])
-	_print_basis_xyz(front_wheel_mesh.global_transform.basis)
-	_print_basis_xyz(new_basis)
-		
-#	var shape_scale = front_wheel_shape.global_transform.basis.get_scale()
+		front_wheel_mesh.global_transform.basis.z)		
 	front_wheel_mesh.global_transform.basis = new_basis
-#	front_wheel_shape.global_transform.basis.scaled(shape_scale)
 
 func _print_basis_xyz(basis):
 	print("(%s, %s, %s)" % [basis.x, basis.y, basis.z])
@@ -125,9 +142,9 @@ func _update_bike_friction():
 	bike_body.physics_material_override.friction = body_friction
 		
 func _update_bike_body_centering(delta):
-	if accelerating:
+	if not drifting and (accelerating or current_speed > max_speed * 0.2):
 		_target_joint_angle = (0.0 / 180.0) * PI
-	elif turning:
+	else:
 		_target_joint_angle = base_joint_angle
 	
 	var cur_joint_angle = stepify(wheel_joint.get_param_y(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT), 0.001)
@@ -147,7 +164,7 @@ func _update_bike_body_centering(delta):
 		
 func _update_bike_roll(delta):
 	var forward_velocity_normal = bike_body.transform.basis.z.cross(bike_body.linear_velocity).y
-	var roll = min(abs(forward_velocity_normal), 2) * sign(forward_velocity_normal) * (current_speed / max_speed) * -1
+	var roll = min(abs(forward_velocity_normal), 1.5) * sign(forward_velocity_normal) * (current_speed / max_speed) * -1
 	wheel_joint.set_param_z(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT, roll)
 	wheel_joint.set_param_z(Generic6DOFJoint.PARAM_ANGULAR_LOWER_LIMIT, roll)
 	
