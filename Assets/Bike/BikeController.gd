@@ -42,9 +42,14 @@ var centre_body_travel = 1.5
 var base_joint_angle = (30.0 / 180.0) * PI
 var percent_centered = 0
 var _target_joint_angle = base_joint_angle
+var _last_joint_upper_angle = base_joint_angle
+var _last_joint_lower_angle = -base_joint_angle
+var _joint_percent_transitioned = 0.0
+var _lock_joint_over_seconds = null
+var _lock_joint_over_distance = null
+var _joint_locked_to_angle = false
 
-var fwheel_locked = false
-var fwheel_unlock_speed = 2.0
+var front_wheel_unlock_speed = 2.0
 
 var in_contact = false
 var accelerating = false
@@ -56,9 +61,9 @@ var drift_early_flick_allowance = 500
 var drift_late_flick_allowance = 100
 var drift_start_force = 24
 # The slide force that will be multiplied by the body speed to create the slide power
-var drift_slide_force_mult = 3
+var drift_slide_force_mult = 18
 # The amount of drift slide power lost each second
-var drift_slide_power_loss = 2
+var drift_slide_power_loss = 70
 var _drift_slide_power
 var _drift_stage_switch_time
 
@@ -87,9 +92,9 @@ func _physics_process(delta):
 	forward_speed = forward_velocity.length() * direction
 	body_speed = front_wheel.linear_velocity.length()
 	
-	if fwheel_locked:
-		if is_drifting() or body_speed <= fwheel_unlock_speed:
-			fwheel_locked = false
+	if is_front_wheel_locked():
+		if is_drifting() or forward_speed <= front_wheel_unlock_speed:
+			unlock_front_wheel()
 	
 	# Movement updates
 	_process_movement_input(delta)
@@ -108,6 +113,7 @@ func _process_movement_input(delta):
 	if Input.is_action_pressed("bike_move_forward") and not is_drifting():
 		if Input.is_action_just_pressed("bike_move_forward"):
 			accelerating = true
+			lock_front_wheel_over_distance(0, centre_body_travel)
 			emit_signal("started_accelerating")
 		if forward_speed < max_speed and in_contact:
 			# Apply force towards the forward vector at max speed
@@ -117,7 +123,7 @@ func _process_movement_input(delta):
 	else:
 		if Input.is_action_just_released("bike_move_forward"):
 			accelerating = false	
-		if fwheel_locked:
+		if is_front_wheel_locked():
 			var force_direction = ((bike_body.global_transform.basis.z * forward_speed) - bike_body.linear_velocity).normalized()
 			bike_body.add_force(force_direction * correction_force * delta, Vector3())
 	
@@ -162,26 +168,28 @@ func _process_movement_input(delta):
 					print("Too slow (%s)" % turn_flick.msec_since())
 					drift = DriftStage.STOPPED
 				else:
-					var drift_power = -turn_flick.distance
-					print("Drift power: %s" % [drift_power])
-					_drift_slide_power = body_speed * drift_slide_force_mult * sign(drift_power)
-					bike_body.add_force(bike_body.transform.basis.x * (drift_start_force * drift_power), Vector3())
+					_drift_slide_power = body_speed * drift_slide_force_mult * sign(-turn_flick.distance)
+					# Set the joint angle to a percentage of the normal front wheel range of rotation based on the intensity of the flick
+					bike_body.add_force(bike_body.transform.basis.x * drift_start_force * -turn_flick.distance, Vector3())
+					lock_front_wheel_over_seconds(clamp(turn_flick.distance, -1, 1) * base_joint_angle, 1)
 					friction_high = friction_high_drifting
 					drift = DriftStage.SLIDING
 		elif drift == DriftStage.SLIDING:
 			bike_body.add_force(bike_body.transform.basis.x * _drift_slide_power * delta, Vector3())
-			front_wheel.add_force(front_wheel.transform.basis.x * _drift_slide_power * delta, Vector3())
+			front_wheel.add_force(front_wheel.transform.basis.x * _drift_slide_power * 0.8 * delta, Vector3())
 			var power_loss = drift_slide_power_loss * delta * sign(_drift_slide_power)
 			_drift_slide_power = _drift_slide_power - power_loss
 			print(_drift_slide_power)
-			if body_speed < 1.0 or abs(power_loss) > abs(_drift_slide_power):
+			if body_speed < 0 or abs(power_loss) > abs(_drift_slide_power):
 				print("Drift stopped")
+				unlock_front_wheel()
 				friction_high = friction_high_normal
 				drift = DriftStage.STOPPED
 	else:
 		if drift != DriftStage.READY:
 			if drift == DriftStage.SLIDING:
 				friction_high = friction_high_normal
+			unlock_front_wheel()
 			drift = DriftStage.READY
 		
 		if turn_input != 0:
@@ -189,7 +197,7 @@ func _process_movement_input(delta):
 				turning = true
 				front_wheel.angular_damp = -1
 			
-			if !fwheel_locked:
+			if !is_front_wheel_locked():
 				front_wheel.add_torque(Vector3(0, 2 * turn_input * delta, 0))
 				
 			bike_body.add_force(bike_body.transform.basis.x * (forward_speed * max_turn_force * turn_input) * delta, Vector3())
@@ -203,6 +211,13 @@ func _process_movement_input(delta):
 			if front_wheel.angular_damp < 1:
 				var percent_damped = min(float(OS.get_ticks_msec() - _turning_damp_start) / turning_damp_time, 1)
 				front_wheel.angular_damp = -1.0 + sin(percent_damped * PI * 0.5) * 2.0
+	
+	if Input.is_action_pressed("test_button"):
+		friction_high = friction_high_drifting
+		bike_body.add_force(bike_body.transform.basis.x * 90 * delta, Vector3())
+		front_wheel.add_force(front_wheel.transform.basis.x * 90 * 0.8 * delta, Vector3())
+	elif Input.is_action_just_released("test_button"):
+		friction_high = friction_high_normal
 			
 func _get_turn_input():
 	if Input.is_action_pressed("bike_rotate_left"):
@@ -240,28 +255,75 @@ func _update_bike_friction():
 	
 	var body_friction = friction_low + (_percent_velocity_sideways(bike_body) * friction_high)
 	bike_body.physics_material_override.friction = body_friction
+	
+func get_front_wheel_angle():
+	var body_vector = Vector2(
+		bike_body.global_transform.basis.z.x,
+		bike_body.global_transform.basis.z.z)
+	var wheel_vector = Vector2(
+		front_wheel.global_transform.basis.z.x,
+		front_wheel.global_transform.basis.z.z)
+	return body_vector.angle_to(wheel_vector)
+	
+func set_front_wheel_locked(value):
+	if value == true:
+		lock_front_wheel_over_seconds(get_front_wheel_angle(), 0)
+	else:
+		unlock_front_wheel()
+	
+func is_front_wheel_locked():
+	var cur_joint_angle = stepify(wheel_joint.get_param_y(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT), 0.001)
+	if cur_joint_angle == _target_joint_angle and _joint_locked_to_angle:
+		return true
+	return false
+	
+func lock_front_wheel_over_seconds(locked_radians, seconds):
+	_joint_locked_to_angle = true
+	_last_joint_upper_angle = stepify(wheel_joint.get_param_y(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT), 0.001)
+	_last_joint_lower_angle = stepify(wheel_joint.get_param_y(Generic6DOFJoint.PARAM_ANGULAR_LOWER_LIMIT), 0.001)
+	_joint_percent_transitioned = 0.0
+	_target_joint_angle = locked_radians
+	_lock_joint_over_seconds = seconds
+	_lock_joint_over_distance = null
+	
+func lock_front_wheel_over_distance(locked_radians, distance):
+	_joint_locked_to_angle = true
+	_last_joint_upper_angle = stepify(wheel_joint.get_param_y(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT), 0.001)
+	_last_joint_lower_angle = stepify(wheel_joint.get_param_y(Generic6DOFJoint.PARAM_ANGULAR_LOWER_LIMIT), 0.001)
+	_joint_percent_transitioned = 0.0
+	_target_joint_angle = locked_radians
+	_lock_joint_over_seconds = null
+	_lock_joint_over_distance = distance
+	
+func unlock_front_wheel():
+	_joint_locked_to_angle = false
+	_target_joint_angle = base_joint_angle
+	_lock_joint_over_seconds = null
+	_lock_joint_over_distance = null
 		
 func _update_bike_body_centering(delta):
-	if accelerating or fwheel_locked:
-		_target_joint_angle = 0.0
-	elif !fwheel_locked:
-		_target_joint_angle = base_joint_angle
-	
-	var cur_joint_angle = stepify(wheel_joint.get_param_y(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT), 0.001)
-	percent_centered = max(1 - (cur_joint_angle / base_joint_angle), 0)
-	if cur_joint_angle > _target_joint_angle:
-		# Gradually step the angle down if the current angle is greater than the target (i.e 30 -> 0deg)
-		# Percent of centre_body_travel traveled in this tick * the total angle to traverse
-		var distance_traveled_in_frame = max(forward_speed * delta, 0)
-		var angle_change = (distance_traveled_in_frame / centre_body_travel) * (base_joint_angle - _target_joint_angle)
-		var new_angle = max(cur_joint_angle - angle_change, 0)
-		wheel_joint.set_param_y(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT, new_angle)
-		wheel_joint.set_param_y(Generic6DOFJoint.PARAM_ANGULAR_LOWER_LIMIT, new_angle * -1)
+	# Because the angle limits are always linked, we can just check against one of the limits
+	var upper_limit_angle = stepify(wheel_joint.get_param_y(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT), 0.001)
+	if _joint_locked_to_angle and upper_limit_angle - _target_joint_angle != 0:
+		# By default set the joint angle to the target instantly
+		assert((_lock_joint_over_seconds != null and _lock_joint_over_distance != null) == false, 
+			"The joint should not be locked both over seconds and over distance.")
+			
+		if _lock_joint_over_seconds != null and _lock_joint_over_distance == null:
+			# Percent change over seconds
+			_joint_percent_transitioned = min(_joint_percent_transitioned + (delta / _lock_joint_over_seconds), 1.0)
+		elif _lock_joint_over_seconds == null and _lock_joint_over_distance != null:
+			# Percent change over distance
+			var distance_traveled_in_frame = max(forward_speed * delta, 0)
+			_joint_percent_transitioned = min(_joint_percent_transitioned + (distance_traveled_in_frame / _lock_joint_over_distance), 1.0)
 		
-		if new_angle == 0:
-			fwheel_locked = true
-	elif cur_joint_angle < _target_joint_angle:
-		# Set the angle in one step if the current angle is less than the target (i.e 0 -> 30deg)
+		var new_upper_angle = _last_joint_upper_angle - (_joint_percent_transitioned * (_last_joint_upper_angle - _target_joint_angle))
+		wheel_joint.set_param_y(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT, new_upper_angle)
+		
+		var new_lower_angle = _last_joint_lower_angle - (_joint_percent_transitioned * (_last_joint_lower_angle - _target_joint_angle))
+		wheel_joint.set_param_y(Generic6DOFJoint.PARAM_ANGULAR_LOWER_LIMIT, new_lower_angle)
+	elif not _joint_locked_to_angle and upper_limit_angle != _target_joint_angle:
+		# When the joint is not locked, the target angle specifies the range of the joint
 		wheel_joint.set_param_y(Generic6DOFJoint.PARAM_ANGULAR_UPPER_LIMIT, _target_joint_angle)
 		wheel_joint.set_param_y(Generic6DOFJoint.PARAM_ANGULAR_LOWER_LIMIT, _target_joint_angle * -1)
 		
