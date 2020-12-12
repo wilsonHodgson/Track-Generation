@@ -2,13 +2,6 @@ extends Spatial
 
 signal started_accelerating
 
-class TurnFlick:
-	var distance = 0
-	var time_msec = 0
-	
-	func msec_since():
-		return OS.get_ticks_msec() - time_msec
-
 onready var front_wheel = get_parent().find_node("BikeFrontWheel")
 onready var front_wheel_mesh = front_wheel.get_node("Mesh")
 onready var front_wheel_shape = front_wheel.get_node("CollisionShape")
@@ -40,7 +33,6 @@ var _turning_damp_start
 # Distance that must be traveled for the body to centre itself
 var centre_body_travel = 1.5
 var base_joint_angle = (30.0 / 180.0) * PI
-var percent_centered = 0
 var _target_joint_angle = base_joint_angle
 var _last_joint_upper_angle = base_joint_angle
 var _last_joint_lower_angle = -base_joint_angle
@@ -55,24 +47,18 @@ var in_contact = false
 var accelerating = false
 var turning = false
 
-enum DriftStage {READY, STARTING, SLIDING, STOPPED}
-var drift = DriftStage.READY
-var drift_early_flick_allowance = 500
-var drift_late_flick_allowance = 100
-var drift_start_force = 24
+enum DriftState {READY, SLIDING_LEFT, SLIDING_RIGHT, STOPPED}
+var drift = DriftState.READY
+var drift_speed_mult = 1.5
+var drift_kick_force = 16
 # The slide force that will be multiplied by the body speed to create the slide power
-var drift_slide_force_mult = 18
-# The amount of drift slide power lost each second
-var drift_slide_power_loss = 70
+var drift_slide_force = 40
+# The amount of drift slide power lost each second after the hold time
+var drift_slide_power_loss = 80
+var drift_slide_max_hold = 1.75
+var _drift_slide_start
 var _drift_slide_power
-var _drift_stage_switch_time
-
-var turn_flick = TurnFlick.new()
-var flick_min_turn_per_sec = 7
-var _turn_flicking = false
-var _last_turn_input = 0
-var _last_held_turn_input = 0
-var _turn_input_started = false
+var _max_drift_input
 
 func _ready():
 	find_node("Camera").activate_camera()
@@ -93,7 +79,7 @@ func _physics_process(delta):
 	body_speed = front_wheel.linear_velocity.length()
 	
 	if is_front_wheel_locked():
-		if is_drifting() or forward_speed <= front_wheel_unlock_speed:
+		if forward_speed <= front_wheel_unlock_speed:
 			unlock_front_wheel()
 	
 	# Movement updates
@@ -107,7 +93,7 @@ func _physics_process(delta):
 	_update_front_wheel_basis()
 	
 func is_drifting():
-	return drift == DriftStage.STARTING or drift == DriftStage.SLIDING
+	return drift == DriftState.SLIDING_LEFT or drift == DriftState.SLIDING_RIGHT
 
 func _process_movement_input(delta):
 	if Input.is_action_pressed("bike_move_forward") and not is_drifting():
@@ -126,91 +112,76 @@ func _process_movement_input(delta):
 		if is_front_wheel_locked():
 			var force_direction = ((bike_body.global_transform.basis.z * forward_speed) - bike_body.linear_velocity).normalized()
 			bike_body.add_force(force_direction * correction_force * delta, Vector3())
-	
 			
 	if Input.is_action_just_pressed("bike_hop") and in_contact:
 		bike_body.add_force(bike_body.transform.basis.y * 1000 * delta, Vector3())
 		front_wheel.add_force(bike_body.transform.basis.y * 2000 * delta, Vector3())
-		
+	
 	var turn_input = _get_turn_input()
-	var turn_delta = abs(turn_input - _last_turn_input) / delta
 	
-	if not _turn_input_started:
-		if turn_input != 0 and turn_delta == 0:
-			_turn_input_started = true
+	if turn_input != 0:
+		if !turning:
+			turning = true
+			front_wheel.angular_damp = -1
+		
+		if !is_front_wheel_locked():
+			front_wheel.add_torque(Vector3(0, 2 * turn_input * delta, 0))
+			
+		bike_body.add_force(bike_body.transform.basis.x * (forward_speed * max_turn_force * turn_input) * delta, Vector3())
+		front_wheel.add_force(front_wheel.transform.basis.x * (forward_speed * max_turn_force * turn_input) * delta, Vector3())
 	else:
-		if turn_input == 0 and turn_delta == 0:
-			_turn_input_started = false
+		if turning:
+			turning = false
+			_turning_damp_start = OS.get_ticks_msec()
+		# Climb to fully dampened turning on a sine wave when no turning is pressed
+		# This gently stops the front wheel front rotating
+		if front_wheel.angular_damp < 1:
+			var percent_damped = min(float(OS.get_ticks_msec() - _turning_damp_start) / turning_damp_time, 1)
+			front_wheel.angular_damp = -1.0 + sin(percent_damped * PI * 0.5) * 2.0
+		
+	var drift_input = _get_drift_input()
 	
-	if turn_delta < flick_min_turn_per_sec:
-		if _turn_flicking:
-			# Don't count releasing input as a flick or the initial turn input 
-			if turn_input != 0:
-				turn_flick.distance = turn_input - _last_held_turn_input
-				turn_flick.time_msec = OS.get_ticks_msec()
-				print(turn_flick.distance)
-			_turn_flicking = false
-		_last_held_turn_input = turn_input
-	else:
-		if _turn_input_started:
-			_turn_flicking = true
-	_last_turn_input = turn_input
-	
-	if Input.is_action_pressed("bike_drift"):
-		if drift == DriftStage.READY:
-				_drift_stage_switch_time = OS.get_ticks_msec()
-				drift = DriftStage.STARTING
-		elif drift == DriftStage.STARTING:
-			# Give the player an extra 100msec to flick the turn input
-			if OS.get_ticks_msec() - _drift_stage_switch_time > drift_late_flick_allowance:
-				var total_allowance = drift_early_flick_allowance + drift_late_flick_allowance
-				if turn_flick.msec_since() > total_allowance:
-					print("Too slow (%s)" % turn_flick.msec_since())
-					drift = DriftStage.STOPPED
+	if drift == DriftState.READY:
+		if drift_input != 0:
+			if drift_input > 0:
+				drift = DriftState.SLIDING_LEFT
+			elif drift_input < 0:
+				drift = DriftState.SLIDING_RIGHT
+			_max_drift_input = 0
+			_drift_slide_power = 0
+			_drift_slide_start = OS.get_ticks_msec()
+			unlock_front_wheel()
+	elif drift != DriftState.STOPPED:
+		if drift_input == 0:
+			drift = DriftState.STOPPED
+		else:
+			var new_drift_input = 0
+			if abs(drift_input) > _max_drift_input:
+				new_drift_input = drift_input - _max_drift_input * sign(drift_input)
+				_max_drift_input = abs(drift_input)
+				
+			var kick_force = new_drift_input * drift_kick_force * (drift_speed_mult * (forward_speed / max_speed))
+			bike_body.add_force(bike_body.transform.basis.x * kick_force, Vector3())
+			
+			var added_slide_force = new_drift_input * drift_slide_force * (drift_speed_mult * (body_speed / max_speed))
+			_drift_slide_power += added_slide_force
+			
+			if OS.get_ticks_msec() > _drift_slide_start + (drift_slide_max_hold * 1000):
+				var slide_power_loss = drift_slide_power_loss * delta * sign(drift_input)
+				if abs(_drift_slide_power) < abs(slide_power_loss):
+					_drift_slide_power = 0
+					drift = DriftState.STOPPED
 				else:
-					_drift_slide_power = body_speed * drift_slide_force_mult * sign(-turn_flick.distance)
-					# Set the joint angle to a percentage of the normal front wheel range of rotation based on the intensity of the flick
-					bike_body.add_force(bike_body.transform.basis.x * drift_start_force * -turn_flick.distance, Vector3())
-					lock_front_wheel_over_seconds(clamp(turn_flick.distance, -1, 1) * base_joint_angle, 1)
-					friction_high = friction_high_drifting
-					drift = DriftStage.SLIDING
-		elif drift == DriftStage.SLIDING:
+					_drift_slide_power -= slide_power_loss
+			
 			bike_body.add_force(bike_body.transform.basis.x * _drift_slide_power * delta, Vector3())
 			front_wheel.add_force(front_wheel.transform.basis.x * _drift_slide_power * 0.8 * delta, Vector3())
-			var power_loss = drift_slide_power_loss * delta * sign(_drift_slide_power)
-			_drift_slide_power = _drift_slide_power - power_loss
-			print(_drift_slide_power)
-			if body_speed < 0 or abs(power_loss) > abs(_drift_slide_power):
-				print("Drift stopped")
-				unlock_front_wheel()
-				friction_high = friction_high_normal
-				drift = DriftStage.STOPPED
-	else:
-		if drift != DriftStage.READY:
-			if drift == DriftStage.SLIDING:
-				friction_high = friction_high_normal
-			unlock_front_wheel()
-			drift = DriftStage.READY
-		
-		if turn_input != 0:
-			if !turning:
-				turning = true
-				front_wheel.angular_damp = -1
+	elif drift == DriftState.STOPPED and drift_input == 0:
+		drift = DriftState.READY
 			
-			if !is_front_wheel_locked():
-				front_wheel.add_torque(Vector3(0, 2 * turn_input * delta, 0))
-				
-			bike_body.add_force(bike_body.transform.basis.x * (forward_speed * max_turn_force * turn_input) * delta, Vector3())
-			front_wheel.add_force(front_wheel.transform.basis.x * (forward_speed * max_turn_force * turn_input) * delta, Vector3())
-		else:
-			if turning:
-				turning = false
-				_turning_damp_start = OS.get_ticks_msec()
-			# Climb to fully dampened turning on a sine wave when no turning is pressed
-			# This gently stops the front wheel front rotating
-			if front_wheel.angular_damp < 1:
-				var percent_damped = min(float(OS.get_ticks_msec() - _turning_damp_start) / turning_damp_time, 1)
-				front_wheel.angular_damp = -1.0 + sin(percent_damped * PI * 0.5) * 2.0
+#	front_wheel.add_force(front_wheel.transform.basis.x * _drift_slide_power * 0.8 * delta, Vector3())
+#	var power_loss = drift_slide_power_loss * delta * sign(_drift_slide_power)
+#	_drift_slide_power = _drift_slide_power - power_loss
 	
 	if Input.is_action_pressed("test_button"):
 		friction_high = friction_high_drifting
@@ -231,6 +202,28 @@ func _get_turn_input():
 		return axis_input
 	else:
 		return 0 
+		
+func _get_drift_input():
+	var left_input
+	if using_joypad:
+		left_input = Input.get_joy_axis(joypad_device, JOY_ANALOG_L2)
+	else: 
+		left_input = int(Input.is_action_pressed("bike_rotate_left") and Input.is_action_pressed("bike_drift"))
+		
+	var right_input
+	if using_joypad:
+		right_input = Input.get_joy_axis(joypad_device, JOY_ANALOG_R2) * -1
+	else: 
+		right_input = int(Input.is_action_pressed("bike_rotate_right") and Input.is_action_pressed("bike_drift")) * -1
+	
+	if drift == DriftState.READY or drift == DriftState.STOPPED:
+		if left_input > abs(right_input):
+			return left_input
+		return right_input 
+	elif drift == DriftState.SLIDING_LEFT:
+		return left_input
+	elif drift == DriftState.SLIDING_RIGHT:
+		return right_input
 
 func _update_fork_basis():
 	front_fork.global_transform.basis = Basis(
