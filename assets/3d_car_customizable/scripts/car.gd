@@ -136,3 +136,9 @@ func _process(delta):
 	# Recorded mouse positions are being deleted
 	# so that we can capture the next movement
 	mouseDelta = Vector2()
+
+func _on_Area_body_entered(body):
+	if ($Timer.read() != 0):
+		$Timer.stop()
+		print("FINISH!!!!")
+		print("Your finishing time is ", $Timer.read(), " seconds!")
