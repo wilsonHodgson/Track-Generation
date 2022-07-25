@@ -41,3 +41,5 @@ script = ExtResource( 2 )
 [node name="ImmediateGeometry" type="ImmediateGeometry" parent="Poor_Track"]
 
 [node name="2D_Track" parent="." instance=ExtResource( 3 )]
+
+[node name="Camera2" type="Camera" parent="."]

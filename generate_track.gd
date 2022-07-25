@@ -1,9 +1,5 @@
 extends Path2D
 
-
-# Declare member variables here. Examples:
-# var a = 2
-# var b = "text"
 var mesh = Array()
 var num_points = self.curve.get_point_count()
 var finish_line
@@ -14,23 +10,25 @@ func drawRoad():
 	var width = 5
 	var num_samples = 120
 	var num_subsamples = float(num_samples)/num_points
-	var starting_line = {}
 	var collision_box
 	var node
+	var endpoint
+	var end_direction
+
 	for i in num_points+1:
 		for j in num_subsamples+1:
-			var point_on_curve = self.curve.interpolate(i, 0)*scale+position
-			var next_point_on_curve = self.curve.interpolate(i, 0.00001)*scale+position
+			var point = i
+			var subPoint = 0
+			var tangent = _interpolated_tangent_2D(point, subPoint)
 				
 			if (j > 0) :
-				point_on_curve = self.curve.interpolate(i, 1/num_subsamples*j)*scale+position
-				next_point_on_curve = self.curve.interpolate(i, (1/num_subsamples*j)+0.00001)*scale+position
+				point = i
+				subPoint = 1/num_subsamples*j
 		
+			var point_on_curve = curve.interpolate(point, subPoint)
 			var point_on_3Dcurve = _2Dto3D(point_on_curve)
-			var next_point_on_3Dcurve = _2Dto3D(next_point_on_curve)
-			
-			var slope_of_curve = point_on_3Dcurve - next_point_on_3Dcurve
-			var perp_slope_of_curve = Vector3(0,1,0).cross(slope_of_curve.normalized())
+
+			var perp_slope_of_curve = _interpolated_tangent_3D(point, subPoint)
 
 			$ImmediateGeometry.add_vertex(point_on_3Dcurve + width*1*perp_slope_of_curve)
 			$ImmediateGeometry.add_vertex(point_on_3Dcurve + width*-1*perp_slope_of_curve)
@@ -51,6 +49,19 @@ func drawRoad():
 
 				mesh.resize(4)
 				
+			if (j == num_subsamples and i == num_points):
+				endpoint = point_on_3Dcurve
+				end_direction = _interpolated_slope_3D(point, subPoint)
+				_build_road_end(endpoint, end_direction)
+				
+
+func _build_road_start(var point:Vector3, var direction:Vector3):
+	pass
+	
+func _build_road_end(var point:Vector3, var direction:Vector3):
+	$FinishLine.global_transform.origin = point
+	$FinishLine.look_at(point + direction, Vector3(0, 1, 0))
+
 func _build_road():
 	var length = curve.get_point_count()
 	var last_position = curve.get_point_position(length-1)
@@ -94,21 +105,31 @@ func _2DPerp(var input : Vector2):
 func _2Dto3D(var input : Vector2 = Vector2(0, 0)):
 	return Vector3(input.x, 0, input.y)
 	
-func _interpolated_slope(var idx, var offset):
-	var point_on_curve = curve.interpolate(idx, offset)*scale+position
-	var approaching_point = curve.interpolate(idx, offset + 0.00001)*scale+position
+func _interpolated_slope_2D(var idx, var offset):
+	var point_on_curve = curve.interpolate(idx, offset)#*scale+position
+	var approaching_point = curve.interpolate(idx, offset + 0.00001)#*scale+position
 	var slope = point_on_curve - approaching_point
 	return slope
 	
+func _interpolated_slope_3D(var idx, var offset):
+	var point_on_curve = curve.interpolate(idx, offset)#*scale+position
+	var approaching_point = curve.interpolate(idx, offset + 0.00001)#*scale+position
+	var slope = point_on_curve - approaching_point
+	return _2Dto3D(slope)
+	
 func _interpolated_tangent_3D(var idx, var offset):
-	var slope3D = _2Dto3D(_interpolated_slope(idx, offset))
+	var slope3D = _2Dto3D(_interpolated_slope_2D(idx, offset))
 	return Vector3(0,1,0).cross(slope3D).normalized()
+	
+func _interpolated_tangent_2D(var idx, var offset):
+	var slope = _interpolated_slope_2D(idx, offset)
+	return slope.normalized()
 
 func _spawnCar():
-	var startingPoint = self.curve.interpolate(0, 0.5)*scale+position
+	var startingPoint = self.curve.interpolate(0, 0.5)#*scale#+position
 	var player = $Car
 	player.global_translate(_2Dto3D(startingPoint) + Vector3(0,10,0))
-	player.look_at(player.global_transform.origin + _2Dto3D(_interpolated_slope(0, 0.5)), Vector3(0, 1, 0))
+	player.look_at(player.global_transform.origin + _interpolated_slope_3D(0, 0.5), Vector3(0, 1, 0))
 
 func _spawnTree():
 	var treeAsset = load("res://Assets/Kenney/tree_oak.obj")
@@ -120,29 +141,33 @@ func _spawnTree():
 func drawTrees(var numTrees):
 	var rng = RandomNumberGenerator.new()
 	for i in numTrees:
+				
 		rng.randomize()
 		var tree = _spawnTree()
 		var distance = rng.randf_range(0, num_points)
+		
 		var idx = floor(distance)
 		var offset = distance - idx
-		var treePos = curve.interpolate(idx, offset)*scale+position
+		var treePos = curve.interpolate(idx, offset)#*scale#+position
+		
 		rng.randomize()
 		var treeOffset = (rng.randi_range(0,1)*2-1)*10*_interpolated_tangent_3D(idx, offset)
 		tree.global_translate(_2Dto3D(treePos) + treeOffset)
 		tree.scale *= (rng.randf_range(4,8))
 		
 func _ready():
+
 	$ImmediateGeometry.begin(PrimitiveMesh.PRIMITIVE_TRIANGLE_STRIP)
 	$ImmediateGeometry.set_color(Color (0, 0, 0))
 	$ImmediateGeometry.set_normal(Vector3 (0, 1, 0))
 
-	finish_line = $Finish.position
+	#finish_line = $Finish.position
+
 	var samples = 200.0
 	#_build_road()
 	drawRoad()
 	drawTrees(100)
 
 	$ImmediateGeometry.end()
-	
 	_spawnCar()
 
